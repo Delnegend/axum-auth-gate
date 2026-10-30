@@ -1,0 +1,6 @@
+# Cargo 1.100+ enforces this on registry versions with publish timestamps.
+[registry]
+global-min-publish-age = "14 days"
+
+[resolver]
+incompatible-publish-age = "deny"

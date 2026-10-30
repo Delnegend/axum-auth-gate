@@ -1,0 +1,27 @@
+# Review by 2026-11-28. OIDC verifies signatures with public keys; this library
+# does not perform RSA private-key operations.
+[[PackageOverrides]]
+name = "rsa"
+version = "0.9.10"
+ecosystem = "crates.io"
+vulnerability.ignore = true
+effectiveUntil = 2026-11-28
+reason = "RUSTSEC-2023-0071 concerns private-key timing; OIDC verifies public signatures."
+
+# Review by 2026-11-28 if OIDC begins performing secret elliptic-curve arithmetic.
+[[PackageOverrides]]
+name = "crypto-bigint"
+version = "0.5.5"
+ecosystem = "crates.io"
+vulnerability.ignore = true
+effectiveUntil = 2026-11-28
+reason = "RUSTSEC-2026-0387 concerns secret integers; OIDC uses public verification keys."
+
+# The source advisory specifies >=0.11.0, but its OSV record starts at 0.
+[[PackageOverrides]]
+name = "block-buffer"
+version = "0.10.4"
+ecosystem = "crates.io"
+vulnerability.ignore = true
+effectiveUntil = 2026-11-28
+reason = "GHSA-qwgh-2vcv-g2f7 describes inline cursor introduced after 0.10.4; OSV range differs from source advisory."
