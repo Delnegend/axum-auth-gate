@@ -1,0 +1,11 @@
+[extend]
+useDefault = true
+
+[[rules]]
+id = "curl-auth-user"
+
+  [[rules.allowlists]]
+  description = "Public local-only credentials in the README quick start"
+  condition = "AND"
+  paths = ['''^README\.md$''']
+  regexes = ['''^demo:example$''']
