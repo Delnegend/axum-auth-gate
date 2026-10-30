@@ -1,45 +1,70 @@
+<div align="center">
+
 # axum-auth-gate
 
-An authentication gate for Axum applications that protects selected routes with HTTP Basic or OpenID Connect.
+**Protect selected Axum routes with a password or an identity provider, without building sign-in yourself.**
 
-## Quick start
+[![CI](https://img.shields.io/github/actions/workflow/status/Delnegend/axum-auth-gate/ci.yml?branch=main&style=flat-square)](https://github.com/Delnegend/axum-auth-gate/actions) [![Crates.io](https://img.shields.io/crates/v/axum-auth-gate?style=flat-square)](https://crates.io/crates/axum-auth-gate) [![License](https://img.shields.io/crates/l/axum-auth-gate?style=flat-square)](#license)
 
-Add the crate to your application:
+</div>
+
+## Quick Start
+
+Create an example Rust application and add the library:
 
 ```sh
-cargo add axum-auth-gate
+cargo new auth-example && cd auth-example
+cargo add axum axum-auth-gate
+cargo add tokio --features macros,rt-multi-thread,net
 ```
 
-Protect the routes that need authentication, supplying credentials from your application's configuration:
+Replace `src/main.rs` with:
 
 ```rust
 use axum::{routing::get, Router};
 use axum_auth_gate::{Auth, AuthConfig, AuthMode};
 
-async fn protected_app(username: String, password: String) -> Result<Router, axum_auth_gate::Error> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let auth = Auth::new(AuthConfig {
-        origin: "https://app.example.com".into(),
+        origin: "http://127.0.0.1:3000".into(),
         mode: AuthMode::Basic {
-            username,
-            password,
-            realm: "Protected application".into(),
+            username: std::env::var("AUTH_USER")?,
+            password: std::env::var("AUTH_PASSWORD")?,
+            realm: "Example".into(),
         },
     }).await?;
-    Ok(auth.protect(Router::new().route("/", get(|| async { "Hello" }))))
+    let app = auth.protect(Router::new().route("/", get(|| async { "Hello" })));
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
+    axum::serve(listener, app).await?;
+    Ok(())
 }
 ```
 
-Serve the returned router with Axum, then open it at the configured origin and authenticate. Keep public routes outside the protected router.
+Run the example, then verify it in another terminal:
+
+```sh
+AUTH_USER=demo AUTH_PASSWORD=example cargo run
+# In another terminal:
+curl -u demo:example http://127.0.0.1:3000/
+```
+
+The response is `Hello`. These credentials and plain HTTP are for local development only. Use HTTPS and securely supplied credentials for a real deployment.
 
 ## Highlights
 
-- Protect a selected router with Basic authentication or an OIDC login.
-- Restrict OIDC access to allowed email addresses or groups.
-- Use a configured public origin instead of trusting forwarded headers.
-- Optionally include the callback in your OpenAPI document with the `openapi` feature.
+- Protect only the routes you choose, leaving public routes outside the gate.
+- Accept a password or sign in through an OpenID Connect identity provider.
+- Limit identity-provider access to allowed email addresses or groups.
+- Avoid trusting forwarded headers for the public origin.
+- Include the sign-in callback in an OpenAPI document when needed.
 
-See [configuration](docs/configuration.md) for OIDC and proxy requirements and [development](docs/development.md) for the checks and release prerequisites.
+## Documentation
+
+- [Configuration](docs/configuration.md) — identity providers, origins, sessions, and reverse proxies.
+- [Development](docs/development.md) — checks and publishing.
+- [API reference](https://docs.rs/axum-auth-gate) — Rust types and methods.
 
 ## License
 
-MIT OR Apache-2.0.
+[MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE).
