@@ -81,7 +81,7 @@ jobs:
       - name: Resolve release
         id: resolve
         if: ${{ !inputs.dry-run }}
-        uses: Delnegend/actions/resolve-release@33a03458466626cef0f1b6c6f1afbb962a40f13e # version-set support
+        uses: Delnegend/actions/resolve-release@da085f98404ececa327b6d00b05341e002787f3e # version-set support
         with:
           ref: ${{ inputs.ref }}
           dry-run: ${{ inputs.dry-run }}
