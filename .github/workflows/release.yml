@@ -120,17 +120,22 @@ jobs:
     needs: [prepare, package]
     if: needs.prepare.outputs.skip != 'true' && needs.prepare.outputs.publish == 'true' && !inputs.dry-run
     runs-on: ubuntu-latest
+    environment: crates-io
     permissions:
       contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.prepare.outputs.ref }}
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      - name: Authenticate with crates.io
+        id: crates-auth
+        uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
       - name: Publish to crates.io
         shell: bash
         env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-auth.outputs.token }}
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           status=$(curl -sS -A 'axum-auth-gate-release/0.1 (https://github.com/Delnegend/axum-auth-gate)' -o /dev/null -w '%{http_code}' "https://crates.io/api/v1/crates/axum-auth-gate/$VERSION")
