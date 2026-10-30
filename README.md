@@ -51,6 +51,8 @@ curl -u demo:example http://127.0.0.1:3000/
 
 The response is `Hello`. These credentials and plain HTTP are for local development only. Use HTTPS and securely supplied credentials for a real deployment.
 
+For identity-provider sign-in instead, see the [OIDC example](docs/configuration.md#oidc-example).
+
 ## Highlights
 
 - Protect only the routes you choose, leaving public routes outside the gate.

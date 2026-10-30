@@ -8,6 +8,26 @@ Construct `AuthConfig` in your application; the library does not read environmen
 
 `AuthMode::Oidc` takes `issuer`, `client_id`, `client_secret`, `redirect_url`, `allowed_emails`, and `allowed_groups`. Register an OIDC confidential client with the provider and register the exact public redirect URL `https://app.example.com/auth/callback`. The redirect must share the configured origin and have no query. Configure at least one allowed email or group; the provider must return the corresponding verified email or group claims. The gate requests the `groups` scope when a group allowlist is configured.
 
+### OIDC example
+
+To use an identity provider with the [Quick Start](../README.md#quick-start), register a confidential client with redirect URL `http://127.0.0.1:3000/auth/callback`. Replace the `AuthConfig` passed to `Auth::new` with:
+
+```rust
+AuthConfig {
+    origin: "http://127.0.0.1:3000".into(),
+    mode: AuthMode::Oidc {
+        issuer: std::env::var("OIDC_ISSUER")?,
+        client_id: std::env::var("OIDC_CLIENT_ID")?,
+        client_secret: std::env::var("OIDC_CLIENT_SECRET")?,
+        redirect_url: "http://127.0.0.1:3000/auth/callback".into(),
+        allowed_emails: vec![],
+        allowed_groups: vec![std::env::var("OIDC_ALLOWED_GROUP")?],
+    },
+}
+```
+
+Set `OIDC_ISSUER` to the provider's HTTPS issuer URL, `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` to the registered client's credentials, and `OIDC_ALLOWED_GROUP` to an exact group name returned by the provider. Run `cargo run`, open `http://127.0.0.1:3000/` in a browser, and sign in with an account in that group. For production, configure an HTTPS origin and matching callback instead of the loopback URLs.
+
 ## Routing and sessions
 
 Call `protect` on the router containing only the routes to secure; it adds `/auth/callback`. Do not merge another callback at that path. Protected `/api` and `/api/*` requests receive API-specific handling; place unrelated public endpoints outside the protected router. The optional `openapi` feature exports `Api` implementing `utoipa::OpenApi` for the callback.
