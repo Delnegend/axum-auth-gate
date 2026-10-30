@@ -1,12 +1,12 @@
 # Configuration
 
-Construct `AuthConfig` in your application; the library does not read environment variables. `origin` is the public scheme and authority only, such as `https://dashboard.example.com`. Use HTTPS except for explicitly configured loopback HTTP (`localhost`, `127.0.0.1`, or `[::1]`) during local development. Behind a reverse proxy, preserve the public `Host` header and configure the external origin, not the upstream address. The gate does not derive its trusted origin from forwarded headers. Browser writes require a matching `Origin`; authenticated non-browser clients may omit it.
+Construct `AuthConfig` in your application; the library does not read environment variables. `origin` is the public scheme and authority only, such as `https://app.example.com`. Use HTTPS except for explicitly configured loopback HTTP (`localhost`, `127.0.0.1`, or `[::1]`) during local development. Behind a reverse proxy, preserve the public `Host` header and configure the external origin, not the upstream address. The gate does not derive its trusted origin from forwarded headers. Browser writes require a matching `Origin`; authenticated non-browser clients may omit it.
 
 ## Authentication modes
 
 `AuthMode::Basic` takes a `username`, `password`, and challenge `realm`. Supply secrets from your application's configuration, not source code. Basic credentials are only protected in transit when HTTPS is used.
 
-`AuthMode::Oidc` takes `issuer`, `client_id`, `client_secret`, `redirect_url`, `allowed_emails`, and `allowed_groups`. Register an OIDC confidential client with the provider and register the exact public redirect URL `https://dashboard.example.com/auth/callback`. The redirect must share the configured origin and have no query. Configure at least one allowed email or group; the provider must return the corresponding verified email or group claims. The gate requests the `groups` scope when a group allowlist is configured.
+`AuthMode::Oidc` takes `issuer`, `client_id`, `client_secret`, `redirect_url`, `allowed_emails`, and `allowed_groups`. Register an OIDC confidential client with the provider and register the exact public redirect URL `https://app.example.com/auth/callback`. The redirect must share the configured origin and have no query. Configure at least one allowed email or group; the provider must return the corresponding verified email or group claims. The gate requests the `groups` scope when a group allowlist is configured.
 
 ## Routing and sessions
 

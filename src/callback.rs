@@ -12,8 +12,8 @@ use openidconnect::{
 use serde::Deserialize;
 
 use super::{
-    Auth, LOGIN_TTL, Mode, Oidc, Pending, SESSION_TTL, authorized, cookie, equal, random_token,
-    set_cookie, with_cookie,
+    Auth, Error, LOGIN_TTL, Mode, Oidc, Pending, SESSION_TTL, authorized, cookie, equal,
+    random_token, set_cookie, with_cookie,
 };
 
 /// Query parameters returned by the OIDC authorization endpoint.
@@ -28,11 +28,11 @@ pub(super) struct Callback {
 }
 
 /// Consumes OIDC callback state and creates a session after successful verification.
-#[cfg_attr(feature = "openapi", utoipa::path(get, path = "/auth/callback", operation_id = "dashboardOidcCallback",
+#[cfg_attr(feature = "openapi", utoipa::path(get, path = "/auth/callback", operation_id = "oidcCallback",
     params(("state" = Option<String>, Query, description = "OIDC state"),
         ("code" = Option<String>, Query, description = "Authorization code"),
         ("error" = Option<String>, Query, description = "Identity provider error")),
-    responses((status = 303, description = "Signed in; redirects to the dashboard"),
+    responses((status = 303, description = "Signed in; redirects to the original path"),
         (status = 400, description = "Invalid or expired login state"),
         (status = 401, description = "Authentication rejected"),
         (status = 404, description = "OIDC is not enabled"),
@@ -87,18 +87,20 @@ pub(super) async fn callback(
 }
 
 /// Exchanges a code and verifies the identity token and authorization claims.
-async fn verify_login(oidc: &Oidc, code: &str, pending: &Pending) -> Result<(), String> {
+async fn verify_login(oidc: &Oidc, code: &str, pending: &Pending) -> Result<(), Error> {
     let tokens = oidc
         .client
         .exchange_code(AuthorizationCode::new(code.to_owned()))
-        .map_err(|e| e.to_string())?
+        .map_err(|e| Error::OidcVerification(Box::new(e)))?
         .set_pkce_verifier(PkceCodeVerifier::new(pending.verifier.clone()))
         .request_async(&oidc.http_client)
         .await
-        .map_err(|e| e.to_string())?;
-    let id_token = tokens.id_token().ok_or("OIDC response missing ID token")?;
+        .map_err(|e| Error::OidcVerification(Box::new(e)))?;
+    let id_token = tokens.id_token().ok_or(Error::MissingIdToken)?;
     if !matches!(
-        id_token.signing_alg().map_err(|e| e.to_string())?,
+        id_token
+            .signing_alg()
+            .map_err(|e| Error::OidcVerification(Box::new(e)))?,
         CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256
             | CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384
             | CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512
@@ -109,11 +111,11 @@ async fn verify_login(oidc: &Oidc, code: &str, pending: &Pending) -> Result<(), 
             | CoreJwsSigningAlgorithm::EcdsaP384Sha384
             | CoreJwsSigningAlgorithm::EdDsa
     ) {
-        return Err("unsupported ID token algorithm".into());
+        return Err(Error::UnsupportedIdTokenAlgorithm);
     }
     let keys = CoreJsonWebKeySet::fetch_async(&oidc.jwks_uri, &oidc.http_client)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| Error::OidcVerification(Box::new(e)))?;
     let verifier = CoreIdTokenVerifier::new_public_client(
         oidc.client.client_id().clone(),
         oidc.issuer.clone(),
@@ -122,19 +124,23 @@ async fn verify_login(oidc: &Oidc, code: &str, pending: &Pending) -> Result<(), 
     .set_allowed_algs(oidc.signing_algorithms.clone());
     let claims = id_token
         .claims(&verifier, &Nonce::new(pending.nonce.clone()))
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| Error::OidcVerification(Box::new(e)))?;
     if claims.subject().as_str().is_empty() {
-        return Err("invalid ID token subject".into());
+        return Err(Error::InvalidSubject);
     }
     if let Some(expected) = claims.access_token_hash() {
         let actual = openidconnect::AccessTokenHash::from_token(
             tokens.access_token(),
-            id_token.signing_alg().map_err(|e| e.to_string())?,
-            id_token.signing_key(&verifier).map_err(|e| e.to_string())?,
+            id_token
+                .signing_alg()
+                .map_err(|e| Error::OidcVerification(Box::new(e)))?,
+            id_token
+                .signing_key(&verifier)
+                .map_err(|e| Error::OidcVerification(Box::new(e)))?,
         )
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| Error::OidcVerification(Box::new(e)))?;
         if actual != *expected {
-            return Err("invalid access token hash".into());
+            return Err(Error::InvalidAccessTokenHash);
         }
     }
     if !authorized(
@@ -144,7 +150,7 @@ async fn verify_login(oidc: &Oidc, code: &str, pending: &Pending) -> Result<(), 
         &oidc.allowed_emails,
         &oidc.allowed_groups,
     ) {
-        return Err("OIDC identity is not authorized".into());
+        return Err(Error::UnauthorizedIdentity);
     }
     Ok(())
 }

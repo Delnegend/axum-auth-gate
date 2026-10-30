@@ -16,13 +16,13 @@ Protect the routes that need authentication, supplying credentials from your app
 use axum::{routing::get, Router};
 use axum_auth_gate::{Auth, AuthConfig, AuthMode};
 
-async fn protected_app(username: String, password: String) -> Result<Router, String> {
+async fn protected_app(username: String, password: String) -> Result<Router, axum_auth_gate::Error> {
     let auth = Auth::new(AuthConfig {
-        origin: "https://dashboard.example.com".into(),
+        origin: "https://app.example.com".into(),
         mode: AuthMode::Basic {
             username,
             password,
-            realm: "Dashboard".into(),
+            realm: "Protected application".into(),
         },
     }).await?;
     Ok(auth.protect(Router::new().route("/", get(|| async { "Hello" }))))
