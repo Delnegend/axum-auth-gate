@@ -12,8 +12,8 @@ use openidconnect::{
 use serde::Deserialize;
 
 use super::{
-    Auth, Error, LOGIN_TTL, Mode, Oidc, Pending, SESSION_TTL, authorized, cookie, equal,
-    random_token, set_cookie, with_cookie,
+    Auth, Error, LOGIN_TTL, Mode, Oidc, Pending, SESSION_TTL, Session, User, authorized, cookie,
+    equal, random_token, set_cookie, with_cookie,
 };
 
 /// Query parameters returned by the OIDC authorization endpoint.
@@ -62,9 +62,9 @@ pub(super) async fn callback(
     let Some(code) = params.code.filter(|_| params.error.is_none()) else {
         return with_cookie(StatusCode::UNAUTHORIZED.into_response(), &clear);
     };
-    if verify_login(oidc, &code, &pending).await.is_err() {
+    let Ok(user) = verify_login(oidc, &code, &pending).await else {
         return with_cookie(StatusCode::UNAUTHORIZED.into_response(), &clear);
-    }
+    };
     let Some(expires) = Instant::now().checked_add(SESSION_TTL) else {
         return with_cookie(StatusCode::INTERNAL_SERVER_ERROR.into_response(), &clear);
     };
@@ -73,7 +73,7 @@ pub(super) async fn callback(
         .lock()
         .await
         .sessions
-        .insert(session.clone(), expires);
+        .insert(session.clone(), Session { expires, user });
     let response = with_cookie(Redirect::to(&pending.return_to).into_response(), &clear);
     with_cookie(
         response,
@@ -86,8 +86,8 @@ pub(super) async fn callback(
     )
 }
 
-/// Exchanges a code and verifies the identity token and authorization claims.
-async fn verify_login(oidc: &Oidc, code: &str, pending: &Pending) -> Result<(), Error> {
+/// Exchanges a code, verifies the identity token, and returns its profile claims.
+async fn verify_login(oidc: &Oidc, code: &str, pending: &Pending) -> Result<User, Error> {
     let tokens = oidc
         .client
         .exchange_code(AuthorizationCode::new(code.to_owned()))
@@ -152,5 +152,22 @@ async fn verify_login(oidc: &Oidc, code: &str, pending: &Pending) -> Result<(), 
     ) {
         return Err(Error::UnauthorizedIdentity);
     }
-    Ok(())
+    let name = claims
+        .name()
+        .and_then(|name| name.get(None))
+        .map(|name| name.as_str().to_owned())
+        .or_else(|| {
+            claims
+                .preferred_username()
+                .map(|username| username.as_str().to_owned())
+        })
+        .or_else(|| claims.email().map(|email| email.as_str().to_owned()));
+    Ok(User {
+        name,
+        email: claims.email().map(|email| email.as_str().to_owned()),
+        avatar: claims
+            .picture()
+            .and_then(|picture| picture.get(None))
+            .map(|picture| picture.as_str().to_owned()),
+    })
 }

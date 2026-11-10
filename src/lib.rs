@@ -101,6 +101,21 @@ type OidcClient = openidconnect::Client<
     EndpointMaybeSet,
 >;
 
+/// Identity asserted by the authentication mechanism.
+///
+/// Basic authentication exposes its configured username. OIDC exposes the
+/// verified identity-token profile claims. Protected handlers receive this
+/// value as a request extension.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+pub struct User {
+    /// Display name, when the provider supplies one.
+    pub name: Option<String>,
+    /// Verified email address, when the provider supplies one.
+    pub email: Option<String>,
+    /// Profile picture URL, when the provider supplies one.
+    pub avatar: Option<String>,
+}
+
 /// Additional identity-token claims used for group authorization.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct ExtraClaims {
@@ -190,8 +205,16 @@ impl Oidc {
 struct Store {
     /// Authorization state tokens mapped to their pending flow.
     pending: HashMap<String, Pending>,
-    /// Session tokens mapped to their expiration instants.
-    sessions: HashMap<String, Instant>,
+    /// Session tokens mapped to their expiry and identity.
+    sessions: HashMap<String, Session>,
+}
+
+/// Authenticated session and the identity captured when it was created.
+struct Session {
+    /// Instant at which the session expires.
+    expires: Instant,
+    /// Identity asserted at login.
+    user: User,
 }
 
 /// Data retained between authorization redirect and callback.

@@ -57,7 +57,7 @@ async fn oidc_signed_login_checks_nonce_group_and_session() {
                 let (nonce, matching_nonce, allowed_group, valid_signature) = scenario.lock().await.clone();
                 let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
                 let header = URL_SAFE_NO_PAD.encode(br#"{"alg":"RS256","kid":"test-key","typ":"JWT"}"#);
-                let claims = json!({"iss":base,"aud":"client","sub":"subject","iat":now,"exp":now.saturating_add(300),"nonce":if matching_nonce {nonce} else {"wrong".into()},"groups":if allowed_group {vec!["admins"]} else {vec!["users"]}});
+                let claims = json!({"iss":base,"aud":"client","sub":"subject","iat":now,"exp":now.saturating_add(300),"nonce":if matching_nonce {nonce} else {"wrong".into()},"groups":if allowed_group {vec!["admins"]} else {vec!["users"]},"name":"Test User","email":"admin@example.com","picture":"https://example.com/avatar.png"});
                 let payload = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).unwrap());
                 let message = format!("{header}.{payload}");
                 let mut signature = vec![0; key.public().modulus_len()];
@@ -86,7 +86,18 @@ async fn oidc_signed_login_checks_nonce_group_and_session() {
     let app = auth.protect(
         Router::new()
             .route("/", get(|| async { "application" }))
-            .route("/api/settings", get(|| async { "settings" })),
+            .route(
+                "/api/settings",
+                get(
+                    |axum::extract::Extension(user): axum::extract::Extension<User>| async move {
+                        axum::Json(serde_json::json!({
+                            "name": user.name,
+                            "email": user.email,
+                            "avatar": user.avatar,
+                        }))
+                    },
+                ),
+            ),
     );
     for (valid_nonce, allowed_group, valid_signature, expected) in [
         (true, true, true, StatusCode::SEE_OTHER),
@@ -180,6 +191,13 @@ async fn oidc_signed_login_checks_nonce_group_and_session() {
                 .await
                 .unwrap();
             assert_eq!(result.status(), StatusCode::OK);
+            let body = axum::body::to_bytes(result.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let identity: Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(identity["name"], "Test User");
+            assert_eq!(identity["email"], "admin@example.com");
+            assert_eq!(identity["avatar"], "https://example.com/avatar.png");
         }
     }
     task.abort();

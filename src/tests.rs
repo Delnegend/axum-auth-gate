@@ -2,6 +2,14 @@ use super::*;
 use axum::{body::Body, http::Request};
 use tower::ServiceExt;
 
+/// Builds a live session carrying the default test identity.
+fn live_session() -> Session {
+    Session {
+        expires: Instant::now().checked_add(SESSION_TTL).unwrap(),
+        user: User::default(),
+    }
+}
+
 #[tokio::test]
 async fn configuration_errors_are_typed() {
     assert!(matches!(safe_url("not a URL"), Err(Error::InvalidUrl(_))));
@@ -202,6 +210,45 @@ async fn protected_pages_are_not_cacheable() {
     }
 }
 
+/// Basic mode exposes its username to protected handlers.
+#[tokio::test]
+async fn basic_identity_is_exposed_to_handlers() {
+    let auth = Auth::new(AuthConfig {
+        origin: "https://app.example".into(),
+        mode: AuthMode::Basic {
+            username: "admin".into(),
+            password: "secret".into(),
+            realm: "test".into(),
+        },
+    })
+    .await
+    .unwrap();
+    let app = auth.protect(Router::new().route(
+        "/",
+        get(
+            |axum::extract::Extension(user): axum::extract::Extension<User>| async move {
+                user.name.unwrap_or_default()
+            },
+        ),
+    ));
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/")
+                .header(header::HOST, "app.example")
+                .header(header::AUTHORIZATION, "Basic YWRtaW46c2VjcmV0")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    assert_eq!(body.as_ref(), b"admin");
+}
+
 /// Expired login slots are reclaimed, but live pending attempts remain bounded.
 #[tokio::test]
 async fn oidc_limits_pending_logins_without_blocking_existing_sessions() {
@@ -222,9 +269,13 @@ async fn oidc_limits_pending_logins_without_blocking_existing_sessions() {
             },
         );
     }
-    store
-        .sessions
-        .insert("valid".into(), now.checked_add(SESSION_TTL).unwrap());
+    store.sessions.insert(
+        "valid".into(),
+        Session {
+            expires: now.checked_add(SESSION_TTL).unwrap(),
+            user: User::default(),
+        },
+    );
     let auth = Auth(
         Arc::new(Mode::Oidc(Box::new(test_oidc(store)))),
         Arc::new(reqwest::Url::parse("https://app.example").unwrap()),
@@ -300,10 +351,7 @@ fn oidc_allows_verified_emails_or_exact_group_membership() {
 #[tokio::test]
 async fn writes_require_trusted_origin_and_host_in_both_modes() {
     let mut store = Store::default();
-    store.sessions.insert(
-        "session".into(),
-        Instant::now().checked_add(SESSION_TTL).unwrap(),
-    );
+    store.sessions.insert("session".into(), live_session());
     let oidc = Mode::Oidc(Box::new(test_oidc(store)));
     for mode in [
         Mode::Basic {

@@ -8,6 +8,24 @@ Construct `AuthConfig` in your application; the library does not read environmen
 
 `AuthMode::Oidc` takes `issuer`, `client_id`, `client_secret`, `redirect_url`, `allowed_emails`, and `allowed_groups`. Register an OIDC confidential client with the provider and register the exact public redirect URL `https://app.example.com/auth/callback`. The redirect must share the configured origin and have no query. Configure at least one allowed email or group; the provider must return the corresponding verified email or group claims. The gate requests the `groups` scope when a group allowlist is configured.
 
+### Authenticated identity
+
+Protected handlers receive `axum_auth_gate::User` in the request extensions:
+
+```rust
+use axum::{extract::Extension, routing::get, Router};
+use axum_auth_gate::User;
+
+let app = auth.protect(Router::new().route(
+    "/api/me",
+    get(|Extension(user): Extension<User>| async move {
+        axum::Json(user)
+    }),
+));
+```
+
+Basic authentication sets `name` to the configured username. OIDC fills `name`, `email`, and `avatar` from the verified identity-token `name`, `email`, and `picture` claims, falling back to `preferred_username` or `email` for the display name when needed. The fields are optional because providers are not required to release those claims.
+
 ### OIDC example
 
 To use an identity provider with the [Quick Start](../README.md#quick-start), register a confidential client with redirect URL `http://127.0.0.1:3000/auth/callback`. Replace the `AuthConfig` passed to `Auth::new` with:

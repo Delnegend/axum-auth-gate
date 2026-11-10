@@ -80,10 +80,7 @@ async fn oidc_cookie_names_and_duplicate_precedence() {
         ),
     ] {
         let mut store = Store::default();
-        store.sessions.insert(
-            "valid".into(),
-            Instant::now().checked_add(SESSION_TTL).unwrap(),
-        );
+        store.sessions.insert("valid".into(), live_session());
         store.pending.insert(
             "valid".into(),
             Pending {

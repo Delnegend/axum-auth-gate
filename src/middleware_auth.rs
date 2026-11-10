@@ -62,7 +62,7 @@ fn valid_request_origin(origin: &reqwest::Url, req: &Request) -> bool {
 }
 
 /// Validates Basic credentials or an OIDC session, starting login when needed.
-async fn authenticate_inner(auth: Auth, req: Request, next: Next) -> Response {
+async fn authenticate_inner(auth: Auth, mut req: Request, next: Next) -> Response {
     match auth.0.as_ref() {
         Mode::Basic {
             username,
@@ -81,6 +81,10 @@ async fn authenticate_inner(auth: Auth, req: Request, next: Next) -> Response {
                     equal(&decoded, expected.as_bytes())
                 });
             if valid {
+                req.extensions_mut().insert(User {
+                    name: Some(username.clone()),
+                    ..User::default()
+                });
                 return next.run(req).await;
             }
             (
@@ -103,15 +107,17 @@ async fn authenticate_inner(auth: Auth, req: Request, next: Next) -> Response {
             let session = cookie(req.headers(), oidc.session_cookie());
             let now = Instant::now();
             let mut store = oidc.state.lock().await;
-            store.sessions.retain(|_, expiry| *expiry > now);
+            store.sessions.retain(|_, session| session.expires > now);
             store
                 .pending
                 .retain(|_, pending| now.duration_since(pending.created) < LOGIN_TTL);
-            if session
+            let user = session
                 .as_ref()
-                .is_some_and(|s| store.sessions.contains_key(s))
-            {
+                .and_then(|session| store.sessions.get(session))
+                .map(|session| session.user.clone());
+            if let Some(user) = user {
                 drop(store);
+                req.extensions_mut().insert(user);
                 return next.run(req).await;
             }
             if req.method() != Method::GET

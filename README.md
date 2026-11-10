@@ -58,6 +58,7 @@ For identity-provider sign-in instead, see the [OIDC example](docs/configuration
 - Protect only the routes you choose, leaving public routes outside the gate.
 - Accept a password or sign in through an OpenID Connect identity provider.
 - Limit identity-provider access to allowed email addresses or groups.
+- Read the authenticated `User` (name, email, avatar) from request extensions.
 - Avoid trusting forwarded headers for the public origin.
 - Include the sign-in callback in an OpenAPI document when needed.
 
