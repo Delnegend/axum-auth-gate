@@ -64,9 +64,9 @@ For identity-provider sign-in instead, see the [OIDC example](docs/configuration
 
 ## Documentation
 
-- [Configuration](docs/configuration.md) — identity providers, origins, sessions, and reverse proxies.
-- [Development](docs/development.md) — checks and publishing.
-- [API reference](https://docs.rs/axum-auth-gate) — Rust types and methods.
+- [Configuration](docs/configuration.md): identity providers, origins, sessions, and reverse proxies.
+- [Development](docs/development.md): checks and publishing.
+- [API reference](https://docs.rs/axum-auth-gate): Rust types and methods.
 
 ## License
 
