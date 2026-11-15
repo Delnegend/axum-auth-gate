@@ -4,9 +4,13 @@
 
 **Protect selected Axum routes with a password or an identity provider, without building sign-in yourself.**
 
-[![CI](https://img.shields.io/github/actions/workflow/status/Delnegend/axum-auth-gate/ci.yml?branch=main&style=flat-square)](https://github.com/Delnegend/axum-auth-gate/actions) [![Crates.io](https://img.shields.io/crates/v/axum-auth-gate?style=flat-square)](https://crates.io/crates/axum-auth-gate) [![License](https://img.shields.io/crates/l/axum-auth-gate?style=flat-square)](#license)
+[![CI](https://img.shields.io/github/actions/workflow/status/Delnegend/axum-auth-gate/ci.yml?branch=main&style=flat-square)](https://github.com/Delnegend/axum-auth-gate/actions)
+[![License](https://img.shields.io/badge/license-MIT%20%7C%20Apache--2.0-blue?style=flat-square)](LICENSE-MIT)
+[![Crates.io](https://img.shields.io/crates/v/axum-auth-gate?style=flat-square)](https://crates.io/crates/axum-auth-gate)
 
 </div>
+
+---
 
 ## Quick Start
 
@@ -64,10 +68,10 @@ For identity-provider sign-in instead, see the [OIDC example](docs/configuration
 
 ## Documentation
 
-- [Configuration](docs/configuration.md): identity providers, origins, sessions, and reverse proxies.
-- [Development](docs/development.md): checks and publishing.
-- [API reference](https://docs.rs/axum-auth-gate): Rust types and methods.
+- **[API reference](https://docs.rs/axum-auth-gate)**: Rust types and methods.
+- **[Development](docs/development.md)**: Checks and publishing.
+- **[Configuration](docs/configuration.md)**: Identity providers, origins, sessions, and reverse proxies.
 
 ## License
 
-[MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE).
+Dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.
