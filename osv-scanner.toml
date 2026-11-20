@@ -25,3 +25,9 @@ ecosystem = "crates.io"
 vulnerability.ignore = true
 effectiveUntil = 2026-11-28
 reason = "GHSA-qwgh-2vcv-g2f7 describes inline cursor introduced after 0.10.4; OSV range differs from source advisory."
+
+# Review upstream OIDC and OAuth migrations by 2026-11-28.
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0543"
+effectiveUntil = 2026-11-28
+reason = "Chrono is unmaintained, with no patched version; openidconnect and oauth2 require it. Review upstream replacements."
