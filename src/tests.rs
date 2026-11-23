@@ -1,5 +1,9 @@
 use super::*;
-use axum::{body::Body, http::Request};
+use axum::{
+    body::Body,
+    http::{Method, Request, StatusCode},
+};
+use base64::engine::general_purpose::STANDARD;
 use tower::ServiceExt;
 
 /// Builds a live session carrying the default test identity.
@@ -71,6 +75,10 @@ async fn rejects_invalid_public_configuration() {
             .is_err()
         );
     }
+}
+
+#[tokio::test]
+async fn rejects_invalid_oidc_configuration() {
     for (issuer, client_id, client_secret, redirect_url, emails, groups) in [
         (
             "",
@@ -140,7 +148,7 @@ async fn rejects_invalid_public_configuration() {
 }
 
 /// Builds a test OIDC configuration with supplied in-memory state.
-pub(super) fn test_oidc(store: Store) -> Oidc {
+pub fn test_oidc(store: Store) -> Oidc {
     let metadata: CoreProviderMetadata = serde_json::from_value(serde_json::json!({
         "issuer": "https://issuer.example",
         "authorization_endpoint": "https://issuer.example/authorize",

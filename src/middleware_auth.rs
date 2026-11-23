@@ -1,7 +1,21 @@
-use super::*;
+use std::time::Instant;
+
+use axum::{
+    extract::{Request, State},
+    http::{HeaderValue, Method, StatusCode, header},
+    middleware::Next,
+    response::{IntoResponse, Redirect, Response},
+};
+use base64::{Engine, engine::general_purpose::STANDARD};
+use openidconnect::{CsrfToken, Nonce, PkceCodeChallenge, Scope, core::CoreAuthenticationFlow};
+
+use super::{
+    Auth, CALLBACK, LOGIN_TTL, MAX_PENDING_LOGINS, Mode, Pending, User, cookie, equal, set_cookie,
+    with_cookie,
+};
 
 /// Checks request origin and authentication, disabling caching for protected responses.
-pub(super) async fn authenticate(State(auth): State<Auth>, req: Request, next: Next) -> Response {
+pub async fn authenticate(State(auth): State<Auth>, req: Request, next: Next) -> Response {
     let mut response = if valid_request_origin(&auth.1, &req) {
         authenticate_inner(auth, req, next).await
     } else {
@@ -68,38 +82,7 @@ async fn authenticate_inner(auth: Auth, mut req: Request, next: Next) -> Respons
             username,
             password,
             realm,
-        } => {
-            let valid = req
-                .headers()
-                .get(header::AUTHORIZATION)
-                .and_then(|v| v.to_str().ok())
-                .and_then(|v| v.split_once(' '))
-                .filter(|(scheme, _)| scheme.eq_ignore_ascii_case("basic"))
-                .and_then(|(_, value)| STANDARD.decode(value).ok())
-                .is_some_and(|decoded| {
-                    let expected = format!("{username}:{password}");
-                    equal(&decoded, expected.as_bytes())
-                });
-            if valid {
-                req.extensions_mut().insert(User {
-                    name: Some(username.clone()),
-                    ..User::default()
-                });
-                return next.run(req).await;
-            }
-            (
-                StatusCode::UNAUTHORIZED,
-                [(
-                    header::WWW_AUTHENTICATE,
-                    format!(
-                        "Basic realm=\"{}\", charset=\"UTF-8\"",
-                        realm.replace('\\', "\\\\").replace('"', "\\\"")
-                    ),
-                )],
-                "Authentication required",
-            )
-                .into_response()
-        }
+        } => authenticate_basic(username, password, realm, req, next).await,
         Mode::Oidc(oidc) => {
             if req.uri().path() == CALLBACK {
                 return next.run(req).await;
@@ -180,4 +163,44 @@ async fn authenticate_inner(auth: Auth, mut req: Request, next: Next) -> Respons
             )
         }
     }
+}
+
+/// Validates Basic credentials and challenges unauthenticated requests.
+async fn authenticate_basic(
+    username: &str,
+    password: &str,
+    realm: &str,
+    mut req: Request,
+    next: Next,
+) -> Response {
+    let valid = req
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split_once(' '))
+        .filter(|(scheme, _)| scheme.eq_ignore_ascii_case("basic"))
+        .and_then(|(_, value)| STANDARD.decode(value).ok())
+        .is_some_and(|decoded| {
+            let expected = format!("{username}:{password}");
+            equal(&decoded, expected.as_bytes())
+        });
+    if valid {
+        req.extensions_mut().insert(User {
+            name: Some(username.to_owned()),
+            ..User::default()
+        });
+        return next.run(req).await;
+    }
+    (
+        StatusCode::UNAUTHORIZED,
+        [(
+            header::WWW_AUTHENTICATE,
+            format!(
+                "Basic realm=\"{}\", charset=\"UTF-8\"",
+                realm.replace('\\', "\\\\").replace('"', "\\\"")
+            ),
+        )],
+        "Authentication required",
+    )
+        .into_response()
 }

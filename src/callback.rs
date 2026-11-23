@@ -18,7 +18,7 @@ use super::{
 
 /// Query parameters returned by the OIDC authorization endpoint.
 #[derive(Deserialize)]
-pub(super) struct Callback {
+pub struct Callback {
     /// CSRF state returned by the provider.
     state: Option<String>,
     /// Authorization code to exchange for tokens.
@@ -37,7 +37,7 @@ pub(super) struct Callback {
         (status = 401, description = "Authentication rejected"),
         (status = 404, description = "OIDC is not enabled"),
         (status = 500, description = "Session could not be created"))))]
-pub(super) async fn callback(
+pub async fn callback(
     State(auth): State<Auth>,
     headers: HeaderMap,
     Query(params): Query<Callback>,

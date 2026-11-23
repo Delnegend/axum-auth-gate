@@ -13,25 +13,21 @@ use std::{
 
 use axum::{
     Router,
-    extract::{Request, State},
-    http::{HeaderMap, HeaderValue, Method, StatusCode, header},
-    middleware::{self, Next},
-    response::{IntoResponse, Redirect, Response},
+    http::{HeaderMap, HeaderValue, header},
+    middleware,
+    response::Response,
     routing::get,
 };
-use base64::{
-    Engine,
-    engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD},
-};
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use openidconnect::{
-    AdditionalClaims, ClientId, ClientSecret, CsrfToken, EmptyExtraTokenFields, EndpointMaybeSet,
-    EndpointNotSet, EndpointSet, IdTokenFields, IssuerUrl, JsonWebKeySetUrl, Nonce,
-    PkceCodeChallenge, RedirectUrl, Scope, StandardErrorResponse, StandardTokenResponse,
+    AdditionalClaims, ClientId, ClientSecret, EmptyExtraTokenFields, EndpointMaybeSet,
+    EndpointNotSet, EndpointSet, IdTokenFields, IssuerUrl, JsonWebKeySetUrl, RedirectUrl,
+    StandardErrorResponse, StandardTokenResponse,
     core::{
-        CoreAuthDisplay, CoreAuthPrompt, CoreAuthenticationFlow, CoreErrorResponseType,
-        CoreGenderClaim, CoreJsonWebKey, CoreJweContentEncryptionAlgorithm,
-        CoreJwsSigningAlgorithm, CoreProviderMetadata, CoreRevocableToken,
-        CoreRevocationErrorResponse, CoreTokenIntrospectionResponse, CoreTokenType,
+        CoreAuthDisplay, CoreAuthPrompt, CoreErrorResponseType, CoreGenderClaim, CoreJsonWebKey,
+        CoreJweContentEncryptionAlgorithm, CoreJwsSigningAlgorithm, CoreProviderMetadata,
+        CoreRevocableToken, CoreRevocationErrorResponse, CoreTokenIntrospectionResponse,
+        CoreTokenType,
     },
 };
 use rand::RngCore;
@@ -185,17 +181,19 @@ struct Oidc {
 impl Oidc {
     /// Selects the host-bound session cookie on HTTPS.
     const fn session_cookie(&self) -> &'static str {
-        match self.secure {
-            true => SESSION_COOKIE_HTTPS,
-            false => SESSION_COOKIE_HTTP,
+        if self.secure {
+            SESSION_COOKIE_HTTPS
+        } else {
+            SESSION_COOKIE_HTTP
         }
     }
 
     /// Selects the host-bound login-state cookie on HTTPS.
     const fn state_cookie(&self) -> &'static str {
-        match self.secure {
-            true => STATE_COOKIE_HTTPS,
-            false => STATE_COOKIE_HTTP,
+        if self.secure {
+            STATE_COOKIE_HTTPS
+        } else {
+            STATE_COOKIE_HTTP
         }
     }
 }
@@ -229,7 +227,7 @@ struct Pending {
     created: Instant,
 }
 
-/// OpenAPI description of the OIDC callback.
+/// `OpenAPI` description of the OIDC callback.
 #[cfg(feature = "openapi")]
 #[derive(utoipa::OpenApi)]
 #[openapi(paths(callback))]
@@ -292,8 +290,29 @@ fn safe_url(value: &str) -> Result<reqwest::Url, Error> {
     Ok(url)
 }
 
+fn basic_mode(username: String, password: String, realm: String) -> Result<Mode, Error> {
+    if username.trim().is_empty() || password.trim().is_empty() || realm.trim().is_empty() {
+        return Err(Error::BlankBasicCredentials);
+    }
+    if username.contains(':') {
+        return Err(Error::InvalidBasicUsername);
+    }
+    if realm.chars().any(char::is_control) {
+        return Err(Error::InvalidBasicRealm);
+    }
+    Ok(Mode::Basic {
+        username,
+        password,
+        realm,
+    })
+}
+
 impl Auth {
     /// Validates configuration and discovers the OIDC provider before serving.
+    ///
+    /// # Errors
+    /// Returns an error if the configuration or endpoint URLs are invalid or unsafe,
+    /// or if the HTTP client cannot be built or OIDC discovery fails.
     pub async fn new(config: AuthConfig) -> Result<Self, Error> {
         let origin = safe_url(&config.origin)?;
         if origin.path() != "/" || origin.query().is_some() {
@@ -304,25 +323,7 @@ impl Auth {
                 username,
                 password,
                 realm,
-            } => {
-                if username.trim().is_empty()
-                    || password.trim().is_empty()
-                    || realm.trim().is_empty()
-                {
-                    return Err(Error::BlankBasicCredentials);
-                }
-                if username.contains(':') {
-                    return Err(Error::InvalidBasicUsername);
-                }
-                if realm.chars().any(char::is_control) {
-                    return Err(Error::InvalidBasicRealm);
-                }
-                Mode::Basic {
-                    username,
-                    password,
-                    realm,
-                }
-            }
+            } => basic_mode(username, password, realm)?,
             AuthMode::Oidc {
                 issuer,
                 client_id,
