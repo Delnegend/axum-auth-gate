@@ -4,9 +4,9 @@
 
 **Protect selected Axum routes with a password or an identity provider, without building sign-in yourself.**
 
-[![CI](https://img.shields.io/github/actions/workflow/status/Delnegend/axum-auth-gate/ci.yml?branch=main&style=flat-square)](https://github.com/Delnegend/axum-auth-gate/actions)
-[![License](https://img.shields.io/badge/license-MIT%20%7C%20Apache--2.0-blue?style=flat-square)](LICENSE-MIT)
-[![Crates.io](https://img.shields.io/crates/v/axum-auth-gate?style=flat-square)](https://crates.io/crates/axum-auth-gate)
+[![CI](https://badgers.space/github/checks/Delnegend/axum-auth-gate/main?corner_radius=0&label=build)](https://github.com/Delnegend/axum-auth-gate/actions)
+[![License](https://badgers.space/badge/license/MIT%20%7C%20Apache-2.0/007ec6?corner_radius=0)](LICENSE-MIT)
+[![Crates.io](https://badgers.space/crates/version/axum-auth-gate?corner_radius=0&color=ea7233)](https://crates.io/crates/axum-auth-gate)
 
 </div>
 

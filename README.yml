@@ -8,7 +8,7 @@ badges:
   license: true
   custom:
     - label: Crates.io
-      image: https://img.shields.io/crates/v/axum-auth-gate?style=flat-square
+      image: https://badgers.space/crates/version/axum-auth-gate?corner_radius=0&color=ea7233
       url: https://crates.io/crates/axum-auth-gate
 quick_start: |
   Create an example Rust application and add the library:
